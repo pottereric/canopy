@@ -48,7 +48,6 @@ build/
 *.vssscc
 .builds
 *.pidb
-*.log
 *.scc
 
 # Visual C++ cache files
@@ -177,3 +176,9 @@ TestResults.xml
 
 # Nuget outputs
 nuget/*.nupkg
+*.orig
+.fake
+
+paket-files/*
+.vs/*
+*.nupkg

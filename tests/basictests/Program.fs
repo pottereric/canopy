@@ -2,34 +2,59 @@ module main
 
 open System
 open OpenQA.Selenium
-open canopy
-open runner
-open configuration
-open reporters
-open types
+open canopy.classic
+open canopy.reporters
+open canopy.runner.classic
+open canopy.configuration
+open canopy.types
 
 start chrome
 let mainBrowser = browser
 elementTimeout <- 3.0
 compareTimeout <- 3.0
 pageTimeout <- 3.0
-runFailedContextsFirst <- true
-reporter <- new LiveHtmlReporter(Chrome, configuration.chromeDir) :> IReporter 
+runFailedContextsFirst <- false
+reporter <- new LiveHtmlReporter(Chrome, chromeDir) :> IReporter
+reporter.setEnvironment "My Machine"
+failureMessagesThatShoulBeTreatedAsSkip <- ["Skip me when I fail"]
 
-failFast := true
+failScreenshotFileName <-
+  (fun test suite ->
+      let suiteContext = if suite.Context = null then "" else suite.Context
+      let cleanName = if test.Description = null then "" else test.Description.Replace(' ','_') //etc
+      let stamp = DateTime.Now.ToString("MMM-d_HH-mm-ss")
+      sprintf "%s_%s_%s" suiteContext cleanName stamp)
+
+failFast := false
+
+loadTestTests.all()
+
+jsonValidatorTests.all()
+
+file1.all()
+file2.all()
 
 context "context1"
 once (fun _ -> Console.WriteLine "once")
 before (fun _ -> Console.WriteLine "before")
 after (fun _ -> Console.WriteLine "after")
 lastly (fun _ -> Console.WriteLine "lastly")
- 
-let testpage = "http://lefthandedgoat.github.io/canopy/testpages/" 
+
+let testpage = "http://lefthandedgoat.github.io/canopy/testpages/"
 
 "intentionally skipped shows blue in LiveHtmlReport" &&! skipped
 
-"#welcome should have Welcome" &&& fun _ ->    
+"Should skip even though it fails" &&& fun _ ->
     url testpage
+    failwith "Skip me when I fail"
+
+"Apostrophes don't break anything" &&& fun _ ->
+    url testpage
+    count "I've got an apostrophe" 1
+
+"#welcome should have Welcome" &&& fun _ ->
+    url testpage
+    skip "test"
     "#welcome" == "Welcome"
 
 //ntest "description" (fun _ -> url "http://www.google.com")
@@ -88,7 +113,7 @@ test (fun _ ->
 "writing to #lastName (as element) sets text to John" &&& fun _ ->
     !^ testpage
     let lastname = element "#lastname"
-    clear lastname   
+    clear lastname
     lastname << "John"
     "#lastname" == "John"
 
@@ -215,6 +240,15 @@ test (fun _ ->
     uncheck "#checkbox"
     element "#checkbox" |> deselected
 
+"rightClicking Works" &&& fun _ ->
+    !^ "https://api.jquery.com/contextmenu/"
+    let iframe = element "iframe"
+    browser.SwitchTo().Frame(iframe) |> ignore
+    notDisplayed ".contextmenu"
+
+    rightClick "div:first"
+    displayed ".contextmenu"
+
 "element within only searching within the element" &&& fun _ ->
     url "http://lefthandedgoat.github.io/canopy/testpages/elementWithin"
     count ".item" 5
@@ -229,6 +263,14 @@ test (fun _ ->
     url "http://lefthandedgoat.github.io/canopy/testpages/elementWithin"
     count ".item" 5
     true === (element "span" |> someElementWithin ".specialItem").IsSome
+
+"element within works with jquery selectors" &&& fun _ ->
+    url "http://lefthandedgoat.github.io/canopy/testpages/elementWithin"
+    "spanned item 6" === (element ".specialItem:visible" |> parent |> elementWithin ".specialItem:visible").Text
+
+"element within works with jquery selectors and respects scope" &&& fun _ ->
+    url "http://lefthandedgoat.github.io/canopy/testpages/elementWithin"
+    false === (element ".specialItem:visible" |> someElementWithin ".specialItem:visible").IsSome
 
 "parent of firstItem and secondItem is list" &&& fun _ ->
     url "http://lefthandedgoat.github.io/canopy/testpages/parent"
@@ -249,13 +291,17 @@ test (fun _ ->
     None === (someElement "#thisIdDoesNotExist")
 
 "someElement fails when more than one element found" &&& fun _ ->
-    url testpage    
+    url testpage
     failsWith "More than one element was selected when only one was expected for selector: .lastName"
     someElement ".lastName" |> ignore
 
 "Navigating to a url should be on url" &&& fun _ ->
     url testpage
     on testpage
+
+"Navigating to a url should be on exact url" &&& fun _ ->
+    url testpage
+    onn testpage
 
 "Navigating to a url with query string should be on url with and without a query string" &&& fun _ ->
     let testpageWithQueryString = testpage + "?param1=weeeee"
@@ -327,7 +373,7 @@ before (fun _ -> Console.WriteLine "only before set now")
     press tab
     press down
 
-"click polling" &&& fun _ -> 
+"click polling" &&& fun _ ->
     url "http://lefthandedgoat.github.io/canopy/testpages/autocomplete"
     click "#search"
     click "table tr td"
@@ -342,34 +388,34 @@ before (fun _ -> Console.WriteLine "only before set now")
 
 "readonly should throw error on read only field with clear" &&& fun _ ->
     failsWith "element #read_only is marked as read only, you can not clear read only elements"
-    !^ "http://lefthandedgoat.github.io/canopy/testpages/readonly"    
+    !^ "http://lefthandedgoat.github.io/canopy/testpages/readonly"
     clear "#read_only"
-        
+
 "readonly should throw error on read only field with write" &&& fun _ ->
     failsWith "element #read_only is marked as read only, you can not write to read only elements"
-    !^ "http://lefthandedgoat.github.io/canopy/testpages/readonly"    
+    !^ "http://lefthandedgoat.github.io/canopy/testpages/readonly"
     "#read_only" << "new text"
 
 "when value is wrong and changes to empty string prior to time out, it should show wrong value, not empty string" &&& fun _ ->
     failsWith "equality check failed.  expected: John1, got: John"
-    url testpage    
+    url testpage
     "#firstName" == "John1"
 
 context "other tests"
 
-"define a custom wait for using any function that takes in unit and returns bool" &&& fun _ ->    
-    let pageLoaded () = 
+"define a custom wait for using any function that takes in unit and returns bool" &&& fun _ ->
+    let pageLoaded () =
         (element "#wait_for").Text = "Done!"
-    
+
     !^ "http://lefthandedgoat.github.io/canopy/testpages/waitFor"
     waitFor pageLoaded
     "#wait_for" == "Done!"
 
-"define a custom wait for using any function that takes in unit and returns bool" &&& fun _ ->    
+"define a custom wait for using any function that takes in unit and returns bool" &&& fun _ ->
     failsWith <| sprintf "waiting for page to load%swaitFor condition failed to become true in 3.0 seconds" System.Environment.NewLine
-    let pageLoaded () = 
+    let pageLoaded () =
         (element "#wait_for").Text = "Done!!!"
-    
+
     !^ "http://lefthandedgoat.github.io/canopy/testpages/waitFor"
     waitFor2 "waiting for page to load" pageLoaded
 
@@ -381,9 +427,9 @@ context "other tests"
     on "http://lefthandedgoat.github.io/canopy/testpages/home"
 
 "define a custom wait for using any function that takes in unit and returns bool, example using lists" &&& fun _ ->
-    let fiveNumbersShown () = 
+    let fiveNumbersShown () =
         (elements ".number").Length = 5
-    
+
     !^ "http://lefthandedgoat.github.io/canopy/testpages/waitFor"
     waitFor fiveNumbersShown
     (elements ".number").Length === 5
@@ -395,6 +441,13 @@ context "other tests"
     "#lastName" << "Grey"
     "#lastName" =~ "Gr[ae]y"
 
+"regex not test" &&& fun _ ->
+    url testpage
+    "#lastName" << "Gray"
+    "#lastName" !=~ "Gr[o]y"
+    "#lastName" << "Grey"
+    "#lastName" !=~ "Gr[o]y"
+
 "regex one of many test" &&& fun _ ->
     url testpage
     "#colors li" *~ "gr[ea]y"
@@ -404,7 +457,7 @@ context "other tests"
     (first "#value_list td").Text === "Value 1"
 
 "test for last function" &&& fun _ ->
-    !^ testpage    
+    !^ testpage
     (last "#value_list td").Text === "Value 4"
 
 "test for nth function" &&& fun _ ->
@@ -422,16 +475,38 @@ context "other tests"
     "#states" == "Kingman Reef"
 
 "writting (selecting) to drop down test, via option value, many options" &&& fun _ ->
-    //note that this can be turned off if its causing you problems via config.writeToSelectWithOptionValue
     !^ testpage
     "#states" << "95"
     "#states" == "Palmyra Atoll"
-    
+
+"writting (selecting) to drop down test, two selects same value" &&& fun _ ->
+    !^ "http://lefthandedgoat.github.io/canopy/testpages/selectOptions"
+    "#test-select" << "g"
+    "#test-select2" << "b"
+    "#test-select" == "Green"
+    "#test-select2" == "Blue"
+
+"writting (selecting) to drop down test, value list, opt group" &&& fun _ ->
+    !^ testpage
+    "#test-select" << "Audi"
+    "#test-select" == "Audi"
+
 "double clicking" &&& fun _ ->
     !^ "http://lefthandedgoat.github.io/canopy/testpages/doubleClick"
     "#clicked" == "Not Clicked"
     doubleClick "#double_click"
     "#clicked" == "Clicked"
+
+"ctrl clicking" &&& fun _ ->
+    !^ "http://lefthandedgoat.github.io/canopy/testpages/ctrlClick"
+
+    ctrlClick "One"
+    ctrlClick "2"
+    ctrlClick "Three"
+
+    selected "1"
+    selected "Two"
+    selected "3"
 
 "displayed test" &&& fun _ ->
     !^ "http://lefthandedgoat.github.io/canopy/testpages/displayed"
@@ -467,7 +542,7 @@ context "other tests"
 
 "count test via sizzle" &&& fun _ ->
     !^ testpage
-    count "option:selected" 2
+    count "option:selected" 3
 
 "#firstName should have John (using == infix operator), iframe1" &&& fun _ ->
     url "http://lefthandedgoat.github.io/canopy/testpages/iframe1"
@@ -475,7 +550,7 @@ context "other tests"
 
 "elementWithin will find iFrame inside of outter element properly, iframe1" &&& fun _ ->
     url "http://lefthandedgoat.github.io/canopy/testpages/iframe1"
-    first "body" |> elementWithin "#states" |> elementWithin "1" |> read |> is "Alabama" 
+    first "body" |> elementWithin "#states" |> elementWithin "1" |> read |> is "Alabama"
 
 "#firstName should have John (using == infix operator), iframe2" &&& fun _ ->
     url "http://lefthandedgoat.github.io/canopy/testpages/iframe2"
@@ -483,14 +558,14 @@ context "other tests"
 
 "elementWithin will find iFrame inside of outter element properly, iframe2" &&& fun _ ->
     url "http://lefthandedgoat.github.io/canopy/testpages/iframe2"
-    first "body" |> elementWithin "#states" |> elementWithin "1" |> read |> is "Alabama" 
+    first "body" |> elementWithin "#states" |> elementWithin "1" |> read |> is "Alabama"
 
 "selecting option in iframe works by text and value" &&& fun _ ->
-    url "http://lefthandedgoat.github.io/canopy/testpages/iframe1"    
-    
+    url "http://lefthandedgoat.github.io/canopy/testpages/iframe1"
+
     "#item_list" << "Item 2"
     "#item_list" == "Item 2"
-    "#item_list" << "3"    
+    "#item_list" << "3"
     "#item_list" == "Item 3"
 
 context "hints tests"
@@ -526,9 +601,9 @@ context "hovering"
     "#hover" == "not hovered"
     hover "Milk"
     "#hover" == "hovered"
-    
+
 context "dragging"
-"draging works" &&& fun _ ->
+"draging works" &&! fun _ ->
     url "http://scrumy.com/silenter39delayed"
     click ".plus-button a img"
     "#task_title" << "Demo"
@@ -536,40 +611,39 @@ context "dragging"
     ".handle" --> ".inprogress"
     click "Blog"
 
-if not (browser :? OpenQA.Selenium.PhantomJS.PhantomJSDriver) then
-    context "alert tests"
+context "alert tests"
 
-    before (fun _ -> !^ "http://lefthandedgoat.github.io/canopy/testpages/alert")
+before (fun _ -> !^ "http://lefthandedgoat.github.io/canopy/testpages/alert")
 
-    "alert box should have 'Alert Test'" &&& fun _ ->    
-        click "#alert_test"
-        alert() == "Alert Test"
-        acceptAlert()
+"alert box should have 'Alert Test'" &&& fun _ ->
+    click "#alert_test"
+    alert() == "Alert Test"
+    acceptAlert()
 
-    "alert box should have 'Alert Test'" &&& fun _ ->
-        click "#alert_test"
-        alert() == "Alert Test"
-        dismissAlert()
+"alert box should have 'Alert Test'" &&& fun _ ->
+    click "#alert_test"
+    alert() == "Alert Test"
+    dismissAlert()
 
-    "alert box should fail correctly when expecting wrong message" &&& fun _ -> 
-        failsWith "equality check failed.  expected: Not the message, got: Alert Test"    
-        click "#alert_test"
-        alert() == "Not the message"
+"alert box should fail correctly when expecting wrong message" &&& fun _ ->
+    failsWith "equality check failed.  expected: Not the message, got: Alert Test"
+    click "#alert_test"
+    alert() == "Not the message"
 
-    "confirmation box should have 'Confirmation Test'" &&& fun _ ->
-        click "#confirmation_test"
-        alert() == "Confirmation Test"
-        acceptAlert()
+"confirmation box should have 'Confirmation Test'" &&& fun _ ->
+    click "#confirmation_test"
+    alert() == "Confirmation Test"
+    acceptAlert()
 
-    "confirmation box should have 'Confirmation Test'" &&& fun _ ->
-        click "#confirmation_test"
-        alert() == "Confirmation Test"
-        dismissAlert()
+"confirmation box should have 'Confirmation Test'" &&& fun _ ->
+    click "#confirmation_test"
+    alert() == "Confirmation Test"
+    dismissAlert()
 
-    "confirmation box should fail correctly when expecting wrong message" &&& fun _ ->
-        failsWith "equality check failed.  expected: Not the message, got: Confirmation Test"
-        click "#confirmation_test"
-        alert() == "Not the message"
+"confirmation box should fail correctly when expecting wrong message" &&& fun _ ->
+    failsWith "equality check failed.  expected: Not the message, got: Confirmation Test"
+    click "#confirmation_test"
+    alert() == "Not the message"
 
 context "multiple elements test"
 
@@ -582,7 +656,7 @@ before (fun _ -> !^ "http://lefthandedgoat.github.io/canopy/testpages/")
     throwIfMoreThanOneElement <- true
     failsWith "More than one element was selected when only one was expected for selector: input"
     read (element "input") === "test value 1"
-        
+
 
 context "tiling windows"
 "start multiple browsers and tile them" &&& fun _ ->
@@ -601,37 +675,37 @@ context "User Agents tests"
 
 "ChromeWithUserAgent userAgents.iPad should show as iPad" &&& fun _ ->
     start <| ChromeWithUserAgent userAgents.iPad
-    url "http://whatsmyuseragent.com/"
-    ".info" *~ "iPad"
+    url "https://www.whoishostingthis.com/tools/user-agent/"
+    ".info-box.user-agent" *~ "iPad"
     quit browser
     switchTo mainBrowser
 
 "FirefoxDeviceWithUserAgent userAgents.iPhone should show as iPhone" &&& fun _ ->
     start <| FirefoxWithUserAgent userAgents.iPhone
-    url "http://whatsmyuseragent.com/"
-    ".info" *~ "iPhone"
+    url "https://www.whoishostingthis.com/tools/user-agent/"
+    ".info-box.user-agent" *~ "iPhone"
     quit browser
     switchTo mainBrowser
 
 "FirefoxDeviceWithUserAgent myagent should show as myagent" &&& fun _ ->
     start <| FirefoxWithUserAgent "myagent"
-    url "http://whatsmyuseragent.com/"
-    ".info" *~ "myagent"
+    url "https://www.whoishostingthis.com/tools/user-agent/"
+    ".info-box.user-agent" *~ "myagent"
     quit browser
     switchTo mainBrowser
 
 context "Resize tests"
 
-"Firefox should be resized to 400,400" &&& fun _ ->
+"Firefox should be resized to 400,400" &&! fun _ ->
     start firefox
     url "http://resizemybrowser.com/"
     resize (400,400)
     "#cWidth" == "400"
-    "#cHeight" == "400"
+    "#cHeight" == "401"
     quit browser
     switchTo mainBrowser
 
-"Chrome should be resized to iPhone4" &&& fun _ ->
+"Chrome should be resized to iPhone4" &&! fun _ ->
     start chrome
     url "http://resizemybrowser.com/"
     resize screenSizes.iPhone4
@@ -640,22 +714,22 @@ context "Resize tests"
     quit browser
     switchTo mainBrowser
 
-"Firefox should be resized to 400,500 then rotated to 500,400" &&& fun _ ->
+"Firefox should be resized to 400,500 then rotated to 500,400" &&! fun _ ->
     start firefox
     url "http://resizemybrowser.com/"
     resize (400,500)
     rotate()
-    "#cHeight" == "400"
-    "#cWidth" == "500"
+    "#cHeight" == "399"
+    "#cWidth" == "501"
     quit browser
     switchTo mainBrowser
 
-"Chrome should be resized and rotated to iPhone4" &&& fun _ ->
+"Chrome should be resized and rotated to iPhone4" &&! fun _ ->
     start chrome
     url "http://resizemybrowser.com/"
     resize screenSizes.iPhone4
     rotate()
-    "#cHeight" == "320"
+    "#cHeight" == "321"
     "#cWidth" == "480"
     quit browser
     switchTo mainBrowser
@@ -664,7 +738,7 @@ context "pluggable finders tests"
 
 //example of a finder you could write so you didnt have to write boring selectors, just add this
 //and let canopy do the work of trying to find something by convention
-let findByHref href f =
+let findByHref href f (_ : IWebDriver) =
     try
         let cssSelector = sprintf "a[href*='%s']" href
         f(By.CssSelector(cssSelector)) |> List.ofSeq
@@ -692,10 +766,7 @@ context "todo tests"
 "write a test that tests the whole internet!" &&& todo
 
 run ()
-        
+
 switchTo mainBrowser
-coverage testpage
-coverage()
-coverage "http://scrumy.com/silenter39delayed"
 
 quit()

@@ -1,7 +1,7 @@
 (*** hide ***)
-// This block of code is omitted in the generated HTML documentation. Use 
+// This block of code is omitted in the generated HTML documentation. Use
 // it to define helpers that you do not want to show in the documentation.
-#I "../../bin"
+#I "../../src/canopy/bin/Release/netstandard2.0"
 
 (**
 canopy - f#rictionless web testing
@@ -20,35 +20,39 @@ canopy - f#rictionless web testing
 
 canopy is a web testing framework with one goal in mind, make UI testing simple:
 
-* Solid stabilization layer built on top of Selenium. Death to "brittle, quirky, UI tests". 
+* Solid stabilization layer built on top of Selenium. Death to "brittle, quirky, UI tests".
 
-* Quick to learn. Even if you've never done UI Automation, and don't know F#. 
+* Quick to learn. Even if you've never done UI Automation, and don't know F#.
 
-* Clean, concise API. 
+* Clean, concise API.
+
+* .net Standard 2.0.
 
 * MIT License.
-   
+
 Getting Started
 ---------------
-####1\. Create a new F# console application
+####1\. Create a new F# console application (4.6.1+ or .net core)
 <img src="img/newProject.png" alt="F# New Project" style="display: inherit;"/>
 
-####2\. Set target framework to .NET Framework 4
-<img src="img/profile.png" alt="Change target framework" style="display: inherit;"/>
-
-####3\. Install canopy via Nuget
+####2\. Install canopy via Nuget
 <img src="img/installCanopy.png" alt="Install canopy" style="display: inherit;"/>
+
+####3\. Install chromedriver via Nuget
+<img src="img/installChromeDriver.png" alt="Install chromedriver" style="display: inherit;"/>
 
 ####4\. Paste the following code into `Program.fs`
 
 *)
 //these are similar to C# using statements
-open canopy
-open runner
-open System
+open canopy.runner.classic
+open canopy.configuration
+open canopy.classic
 
-//start an instance of the firefox browser
-start firefox
+canopy.configuration.chromeDir <- System.AppContext.BaseDirectory
+
+//start an instance of chrome
+start chrome
 
 //this is how you define a test
 "taking canopy for a spin" &&& fun _ ->
@@ -85,11 +89,32 @@ quit()
 ####5\. Run
 <img src="img/run.png" alt="Run" style="display: inherit;"/>
 
-####6\. Explore the rest of canopy's API 
+####6\. Explore the rest of canopy's API
 
+* [Upgrade 1.x -> 2.x](/canopy/upgrade1to2.html): documentation of upgrading from canopy 1.x to 2.x
 * [Actions](/canopy/actions.html): documentation of everything you can do on a page
 * [Assertions](/canopy/assertions.html): all the ways you can verify what's on the page is correct
+* [Configuration](/canopy/configuration.html): configure and fine tune canopy
 * [Testing](/canopy/testing.html): different ways to orchestrate tests and troubleshoot issues with a page
 * [Reporting](/canopy/reporting.html): different ways to output the results of your test suite
 
+####7\. Watch some intro videos
+4 minute canopy starter kit
+<iframe width="960" height="540" src="https://www.youtube.com/embed/kLNPl3EcsCI" frameborder="0" allowfullscreen></iframe>
+
+5 minutes with Amir Rajan
+<iframe src="https://channel9.msdn.com/Events/NET-Fringe/NET-Fringe-2015/Web-UI-Testing-with-F-and-Canopy/player"
+    width="960"
+    height="540"
+    allowFullScreen
+    frameBorder="0">
+</iframe>
+
+30 minutes with Chris Holt at fsharpConf
+<iframe src="https://channel9.msdn.com/Events/FSharp-Events/fsharpConf-2016/Web-UI-Automation-with-F-and-canopy/player"
+    width="960"
+    height="540"
+    allowFullScreen
+    frameBorder="0">
+</iframe>
 *)

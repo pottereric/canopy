@@ -7,18 +7,15 @@ let p = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @
 let path = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\canopy\failedContexts.txt"
 
 let save (results : string list) =
-    if Directory.Exists(p) = false then Directory.CreateDirectory(p) |> ignore
-    if File.Exists(path) = false then File.Create(path).Close()
-    using(new StreamWriter(path)) (fun sw ->    
-        sw.Write (String.Join("|", (results |> Array.ofList)))
-    )
+    if canopy.configuration.runFailedContextsFirst = true then
+        if Directory.Exists(p) = false then Directory.CreateDirectory(p) |> ignore
+        use sw = new StreamWriter(path)
+        sw.Write (String.concat "|" results)
 
-let get _ =
-    let emptyList : string list = []
-    if File.Exists(path) = false then 
-        emptyList
+let get _ =    
+    if File.Exists(path) = false then
+        []
     else
-        using(new StreamReader(path)) (fun sr ->
-            let line = sr.ReadToEnd()
-            line.Split('|') |> List.ofArray
-        )
+        use sr = new StreamReader(path)        
+        let line = sr.ReadToEnd()
+        line.Split('|') |> List.ofArray

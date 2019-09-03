@@ -1,4 +1,4 @@
-﻿// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 // FAKE build script 
 // --------------------------------------------------------------------------------------
 #r @"packages/FAKE/tools/FakeLib.dll"
@@ -21,6 +21,7 @@ open System
 // The name of the project 
 // (used by attributes in AssemblyInfo, name of a NuGet package and directory in 'src')
 let project = "canopy"
+let projectIntegration = "canopy.integration"
 
 // Short summary of the project
 // (used as description in AssemblyInfo and as a short summary for NuGet package)
@@ -29,6 +30,7 @@ let summary = "F# web testing framework"
 // Longer description of the project
 // (used as a description for NuGet package; line breaks are automatically cleaned up)
 let description = """A simple framework in F# on top of selenium for writing UI automation and tests."""
+let descriptionIntegration = """A sister package to canopy for integration tests."""
 // List of author names (for NuGet package)
 let authors = [ "Chris Holt" ]
 // Tags for your project (for NuGet package)
@@ -63,12 +65,18 @@ Target "AssemblyInfo" (fun _ ->
         Attribute.Description summary
         Attribute.Version release.AssemblyVersion
         Attribute.FileVersion release.AssemblyVersion ] 
+
+  let fileName = "src/" + projectIntegration + "/AssemblyInfo.fs"
+  CreateFSharpAssemblyInfo fileName
+      [ Attribute.Title projectIntegration
+        Attribute.Product projectIntegration
+        Attribute.Description summary
+        Attribute.Version release.AssemblyVersion
+        Attribute.FileVersion release.AssemblyVersion ] 
 )
 
 // --------------------------------------------------------------------------------------
-// Clean build results & restore NuGet packages
-
-Target "RestorePackages" RestorePackages
+// Clean build results
 
 Target "Clean" (fun _ ->
     CleanDirs ["bin"; "temp"]
@@ -83,7 +91,7 @@ Target "CleanDocs" (fun _ ->
 
 Target "Build" (fun _ ->
     !! (solutionFile + "*.sln")
-    |> MSBuild "" "Rebuild" [ "Configuration", "Release"; "VisualStudioVersion", "11.0" ]
+    |> MSBuild "" "Rebuild" [ "Configuration", "Release"; "VisualStudioVersion", "15.0" ]
     |> ignore
 )
 
@@ -131,21 +139,30 @@ Target "NuGet" (fun _ ->
         ("nuget/" + project + ".nuspec")
 )
 
-Target "NuGet-edge" (fun _ ->
+Target "NuGet.Integration" (fun _ ->
+    CleanDirs ["temp"]
+    CreateDir "temp/lib"
+    
+    XCopy @"./bin" "temp/lib"
+    !! @"temp/lib/*.*"
+      -- @"temp/lib/canopy.integration.???"
+      |> Seq.iter (System.IO.File.Delete)
+
     NuGet (fun p -> 
         { p with   
             Authors = authors
-            Project = project
+            Project = projectIntegration
             Summary = summary
-            Description = description
+            Description = descriptionIntegration
             Version = release.NugetVersion
             ReleaseNotes = String.Join(Environment.NewLine, release.Notes)
             Tags = tags
+            WorkingDir = "temp"
             OutputPath = "bin"
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey"
             Dependencies = [] })
-        ("nuget/" + project + "-edge.nuspec")
+        ("nuget/canopy.integration.nuspec")
 )
 
 // --------------------------------------------------------------------------------------
@@ -178,18 +195,17 @@ Target "Release" DoNothing
 Target "All" DoNothing
 
 "Clean"
-  ==> "RestorePackages"
   ==> "AssemblyInfo"
   ==> "Build"
   ==> "RunTests"
   ==> "All"
 
 "All" 
-  ==> "CleanDocs"
-  ==> "GenerateDocs"
-  ==> "ReleaseDocs"
+  //==> "CleanDocs"
+  //==> "GenerateDocs"
+  //==> "ReleaseDocs"
   ==> "NuGet"
-  ==> "NuGet-edge"
+  ==> "NuGet.Integration"
   ==> "Release"
 
 RunTargetOrDefault "All"
